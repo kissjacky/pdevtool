@@ -1,0 +1,22 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+import json
+
+class Py2jsonBaseEncoder(json.JSONEncoder):
+    def default(self, o):
+        return o.__dict__
+
+class Py2jsonBase:
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            self.__dict__[k] = v
+    
+{{ range $cls, $value := .Classes }}
+class {{ $cls }}(Py2jsonBase):
+    pass
+{{end}}
+
+a={{.ObjStr}}
+
+cc=json.dumps(a, indent=4, cls=Py2jsonBaseEncoder)
+print(cc)
