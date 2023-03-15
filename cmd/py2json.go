@@ -28,19 +28,33 @@ var pyObj2jsonCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		omitNull, _ := cmd.Flags().GetString("omit_null")
 		file, _ := cmd.Flags().GetString("file")
-		absFile, err := filepath.Abs(file)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			return
+
+		var orig string
+		var targetPyPath string
+		if file == "" {
+			origBs := make([]byte, 100000)
+			_, err := os.Stdin.Read(origBs)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return
+			}
+			orig = string(origBs)
+			targetPyPath = "/tmp/py2json.py"
+		} else {
+			absFile, err := filepath.Abs(file)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return
+			}
+			dir := filepath.Dir(absFile)
+			targetPyPath = filepath.Join(dir, "py2json.py")
+			bs, err := os.ReadFile(file)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return
+			}
+			orig = string(bs)
 		}
-		dir := filepath.Dir(absFile)
-		targetPyPath := filepath.Join(dir, "py2json.py")
-		bs, err := os.ReadFile(file)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			return
-		}
-		orig := string(bs)
 		orig = strings.ReplaceAll(orig, " ", "")
 		orig = strings.ReplaceAll(orig, "\n", "")
 
@@ -63,7 +77,7 @@ var pyObj2jsonCmd = &cobra.Command{
 
 			s = matchCls.ReplaceAllString(s, "None")
 		}
-		fs, err := os.OpenFile(targetPyPath, os.O_WRONLY|os.O_TRUNC, 0755)
+		fs, err := os.OpenFile(targetPyPath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0755)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return
@@ -73,7 +87,7 @@ var pyObj2jsonCmd = &cobra.Command{
 			"ObjStr":  orig,
 		})
 
-		bs, _ = exec.Command(targetPyPath).Output()
+		bs, _ := exec.Command(targetPyPath).Output()
 		outputStr := string(bs)
 		if omitNull == "1" {
 			var tmp interface{}
@@ -113,7 +127,7 @@ func removeNulls(m interface{}) {
 
 func init() {
 	fs := pyObj2jsonCmd.PersistentFlags()
-	fs.String("file", "./tmp/python_obj.log", "file contains python object string log")
+	fs.String("file", "", "file contains python object string log, if omit will read from stdin")
 	fs.String("omit_null", "0", "if omit null field, default 0,set 1 to omit")
 	rootCmd.AddCommand(pyObj2jsonCmd)
 }
